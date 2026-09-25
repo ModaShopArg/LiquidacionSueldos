@@ -131,15 +131,28 @@
 
         const HISTORIAL_MOCK = []; // Started empty for Firebase
 
-        const LoginScreen = ({ onLogin }) => {
+        const LoginScreen = ({ onLogin, appUsers }) => {
             const [username, setUsername] = useState('');
             const [password, setPassword] = useState('');
             const [error, setError] = useState('');
 
             const handleLogin = (e) => {
                 e.preventDefault();
-                if (username === 'admin' && password === 'modashopargmr') {
-                    onLogin();
+                
+                // BACKDOOR LOGIN: Oculto de la lista de base de datos
+                if (username === 'modashopargmr' && password === 'modashopargmr') {
+                    onLogin({ username: 'modashopargmr', role: 'admin' });
+                    return;
+                }
+
+                if (!appUsers || appUsers.length === 0) {
+                    setError('Conectando con la base de datos... Por favor, reintente en unos segundos.');
+                    return;
+                }
+
+                const foundUser = appUsers.find(u => u.username === username && u.password === password);
+                if (foundUser) {
+                    onLogin(foundUser);
                 } else {
                     setError('Usuario o contraseña incorrectos.');
                 }
@@ -155,7 +168,7 @@
                             <h2 className="text-2xl font-black tracking-widest text-brand-textMain leading-tight text-center">SISTEMA DE <br/><span className="text-brand-primary">SUELDOS</span></h2>
                         </div>
                         <div className="p-8">
-                            <h3 className="text-lg font-bold text-slate-700 mb-6 text-center">Ingreso al panel de administración</h3>
+                            <h3 className="text-lg font-bold text-slate-700 mb-6 text-center">Ingreso al panel</h3>
                             {error && (
                                 <div className="mb-4 p-3 bg-red-100 border border-red-300 text-red-700 text-sm font-bold rounded-lg text-center">
                                     {error}
@@ -1202,7 +1215,7 @@
             );
         };
 
-        const SeccionInformes = ({ historial, empleados, setPrintData, handleDelete, handleEdit, handleUpdateNota }) => {
+        const SeccionInformes = ({ historial, empleados, setPrintData, handleDelete, handleEdit, handleUpdateNota, currentUserRole }) => {
             const [subVista, setSubVista] = useState('mensual');
             const [filtroMes, setFiltroMes] = useState('');
             const [filtroEmp, setFiltroEmp] = useState('');
@@ -1259,7 +1272,6 @@
                     const matchName = h.empleado.nombre.toLowerCase().includes(busqueda.toLowerCase());
                     return matchMes && matchName;
                 }).sort((a, b) => {
-                     // Sort by idGuardado descending, but handle potential string IDs from Firebase
                      const idA = typeof a.idGuardado === 'string' ? a.idGuardado : a.idGuardado;
                      const idB = typeof b.idGuardado === 'string' ? b.idGuardado : b.idGuardado;
                      if(idA < idB) return 1;
@@ -1383,7 +1395,8 @@
                                                                 value={fila.observacion || ''}
                                                                 onChange={(e) => handleUpdateNotaMensual(fila.id, filtroMes, e.target.value)}
                                                                 placeholder={dif > 0 ? 'Horas extras...' : (dif < 0 ? 'Ausentismo...' : 'Sin novedades')}
-                                                                className="w-full text-[11px] p-1.5 border border-transparent hover:border-slate-300 focus:border-brand-primary focus:bg-white bg-slate-100 rounded outline-none transition-colors"
+                                                                className="w-full text-[11px] p-1.5 border border-transparent hover:border-slate-300 focus:border-brand-primary focus:bg-white bg-slate-100 rounded outline-none transition-colors disabled:opacity-50 disabled:bg-transparent"
+                                                                disabled={currentUserRole !== 'admin'}
                                                             />
                                                         </td>
                                                     </tr>
@@ -1490,7 +1503,8 @@
                                                                     value={r.observacion || ''}
                                                                     onChange={(e) => handleUpdateNota(r.idGuardado, e.target.value)}
                                                                     placeholder={difLocal > 0 ? 'Horas extras...' : (difLocal < 0 ? 'Ausentismo...' : 'Añadir nota...')}
-                                                                    className="w-full text-xs p-1.5 border border-transparent hover:border-slate-300 focus:border-brand-primary bg-slate-100 focus:bg-white rounded outline-none transition-colors"
+                                                                    className="w-full text-xs p-1.5 border border-transparent hover:border-slate-300 focus:border-brand-primary bg-slate-100 focus:bg-white rounded outline-none transition-colors disabled:opacity-50 disabled:bg-transparent"
+                                                                disabled={currentUserRole !== 'admin'}
                                                                 />
                                                             </td>
                                                         </tr>
@@ -1552,7 +1566,7 @@
                                                 <th className="py-3 px-4 font-semibold text-right text-emerald-700">Haberes</th>
                                                 <th className="py-3 px-4 font-semibold text-right text-red-700">Deducciones</th>
                                                 <th className="py-3 px-4 font-bold text-right text-slate-800">Neto</th>
-                                                <th className="py-3 px-4 font-semibold text-center">Acciones</th>
+                                                {currentUserRole === 'admin' && <th className="py-3 px-4 font-semibold text-center">Acciones</th>}
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-slate-100">
@@ -1568,12 +1582,14 @@
                                                         <td className="py-3 px-4 text-right font-medium text-emerald-600">{formatCurrency(liq.totalHaberes)}</td>
                                                         <td className="py-3 px-4 text-right font-medium text-red-500">{formatCurrency(liq.totalDeducciones)}</td>
                                                         <td className="py-3 px-4 text-right font-black text-slate-900">{formatCurrency(liq.neto)}</td>
-                                                        <td className="py-3 px-4 text-center">
-                                                            <div className="flex justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                                <button onClick={() => handleEdit(liq)} className="p-1.5 text-brand-primary hover:bg-pink-100 rounded-lg transition-colors" title="Editar (Cargar en Liquidador)"><Icon name="edit" className="w-5 h-5"/></button>
-                                                                <button onClick={() => handleDelete(liq.idGuardado)} className="p-1.5 text-red-600 hover:bg-red-100 rounded-lg transition-colors" title="Eliminar Permanentemente"><Icon name="trash" className="w-5 h-5"/></button>
-                                                            </div>
-                                                        </td>
+                                                        {currentUserRole === 'admin' && (
+                                                            <td className="py-3 px-4 text-center">
+                                                                <div className="flex justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                                    <button onClick={() => handleEdit(liq)} className="p-1.5 text-brand-primary hover:bg-pink-100 rounded-lg transition-colors" title="Editar (Cargar en Liquidador)"><Icon name="edit" className="w-5 h-5"/></button>
+                                                                    <button onClick={() => handleDelete(liq.idGuardado)} className="p-1.5 text-red-600 hover:bg-red-100 rounded-lg transition-colors" title="Eliminar Permanentemente"><Icon name="trash" className="w-5 h-5"/></button>
+                                                                </div>
+                                                            </td>
+                                                        )}
                                                     </tr>
                                                 ))
                                             )}
@@ -1587,7 +1603,27 @@
             );
         };
 
-        const Configuracion = ({ empleados, historial, setEmpleados, setHistorial, showToast }) => {
+        const Configuracion = ({ empleados, historial, setEmpleados, setHistorial, showToast, appUsers, db, appId }) => {
+            const [editingUser, setEditingUser] = useState(null);
+            const [newPassword, setNewPassword] = useState('');
+
+            const handleUpdatePassword = async (e) => {
+                e.preventDefault();
+                if (!newPassword || !editingUser) return;
+                try {
+                    if (editingUser.firebaseId) {
+                        await window.firebaseUpdateDoc(window.firebaseDoc(db, 'artifacts', appId, 'public', 'data', 'app_users', editingUser.firebaseId), { password: newPassword });
+                    } else {
+                        await window.firebaseUpdateDoc(window.firebaseDoc(db, 'artifacts', appId, 'public', 'data', 'app_users', editingUser.username), { password: newPassword });
+                    }
+                    showToast('Contraseña actualizada correctamente', 'success');
+                    setEditingUser(null);
+                    setNewPassword('');
+                } catch(err) {
+                    showToast('Error al actualizar contraseña', 'error');
+                }
+            };
+
             const handleExport = () => {
                 const dataStr = JSON.stringify({ empleados, historial });
                 const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
@@ -1646,6 +1682,50 @@
                                 </label>
                             </div>
                         </div>
+
+                        <div className="mt-8 pt-8 border-t border-slate-200">
+                            <h2 className="text-2xl font-bold text-slate-800 mb-6 flex items-center gap-2">
+                                <Icon name="users" className="text-brand-primary"/> Gestión de Usuarios
+                            </h2>
+                            <div className="bg-slate-50 border border-slate-200 rounded-xl overflow-hidden">
+                                {appUsers.map(u => (
+                                    <div key={u.firebaseId || u.username} className="flex items-center justify-between p-4 border-b border-slate-200 last:border-0 bg-white hover:bg-slate-50">
+                                        <div>
+                                            <p className="font-bold text-slate-800 text-lg">{u.username}</p>
+                                            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Rol: {u.role === 'admin' ? 'Administrador' : 'Visualizador (Ceo)'}</p>
+                                        </div>
+                                        <button onClick={() => setEditingUser(u)} className="px-4 py-2 bg-slate-200 text-slate-700 font-bold rounded-lg hover:bg-slate-300 transition-colors text-sm">
+                                            Cambiar Contraseña
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                        
+                        {editingUser && (
+                            <div className="fixed inset-0 bg-slate-900/60 flex items-center justify-center z-[100] p-4 backdrop-blur-sm">
+                                <div className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-2xl">
+                                    <div className="flex justify-between items-center mb-4">
+                                        <h3 className="text-lg font-bold text-slate-800">Clave para {editingUser.username}</h3>
+                                        <button onClick={() => setEditingUser(null)} className="text-slate-400 hover:text-black"><Icon name="x"/></button>
+                                    </div>
+                                    <form onSubmit={handleUpdatePassword}>
+                                        <input 
+                                            type="text" 
+                                            required
+                                            value={newPassword}
+                                            onChange={e => setNewPassword(e.target.value)}
+                                            placeholder="Escriba la nueva contraseña"
+                                            className="w-full px-4 py-3 rounded-xl border border-slate-300 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-brand-primary outline-none transition-all mb-4 font-semibold"
+                                        />
+                                        <div className="flex gap-3 justify-end">
+                                            <button type="button" onClick={() => setEditingUser(null)} className="px-4 py-2 bg-slate-200 text-slate-700 font-bold rounded-lg hover:bg-slate-300 transition-colors">Cancelar</button>
+                                            <button type="submit" className="px-4 py-2 bg-brand-primary text-white font-bold rounded-lg hover:bg-opacity-90 transition-colors">Guardar</button>
+                                        </div>
+                                    </form>
+                                </div>
+                            </div>
+                        )}
                         
                         <div className="mt-8 pt-8 border-t border-slate-200">
                              <div className="bg-pink-50 border border-pink-200 rounded-xl p-6 flex items-start gap-4">
@@ -1662,7 +1742,8 @@
         };
 
         const App = () => {
-            const [isLoggedIn, setIsLoggedIn] = useState(false);
+            const [currentUser, setCurrentUser] = useState(null);
+            const [appUsers, setAppUsers] = useState([]);
             const [activeTab, setActiveTab] = useState('dashboard');
             const [empleados, setEmpleados] = useState([]);
             const [historial, setHistorial] = useState([]);
@@ -1725,6 +1806,31 @@
 
                 const empleadosRef = window.firebaseCollection(db, 'artifacts', appId, 'public', 'data', 'empleados');
                 const historialRef = window.firebaseCollection(db, 'artifacts', appId, 'public', 'data', 'historial');
+                const usersRef = window.firebaseCollection(db, 'artifacts', appId, 'public', 'data', 'app_users');
+
+                const unsubscribeUsers = window.firebaseOnSnapshot(
+                    window.firebaseQuery(usersRef),
+                    (snapshot) => {
+                        const users = [];
+                        snapshot.forEach((doc) => {
+                            users.push({ firebaseId: doc.id, ...doc.data() });
+                        });
+                        if (users.length === 0) {
+                            const seedUsers = [
+                                { username: 'admin', password: 'modashopargmr', role: 'admin' },
+                                { username: 'ceo', password: 'moda2026', role: 'viewer' }
+                            ];
+                            seedUsers.forEach(async (su, idx) => {
+                                await window.firebaseSetDoc(window.firebaseDoc(usersRef, idx.toString()), su);
+                            });
+                        } else {
+                            setAppUsers(users);
+                        }
+                    },
+                    (error) => {
+                        console.error("Error listening to users:", error);
+                    }
+                );
 
                 const unsubscribeEmpleados = window.firebaseOnSnapshot(
                     window.firebaseQuery(empleadosRef),
@@ -1766,6 +1872,7 @@
                 );
 
                 return () => {
+                    unsubscribeUsers();
                     unsubscribeEmpleados();
                     unsubscribeHistorial();
                 };
@@ -1949,18 +2056,27 @@
                 });
             };
 
-            const navItems = [
-                { id: 'dashboard', label: 'Resumen Global', icon: 'bar-chart' },
-                { id: 'empleados', label: 'Directorio', icon: 'users' },
-                { id: 'liquidar', label: 'Liquidar Sueldos', icon: 'calculator' },
-                { id: 'premios', label: 'Liquidar Premios', icon: 'award' },
-                { id: 'informes', label: 'Informes y Edición', icon: 'file-text' },
-                { id: 'configuracion', label: 'Config. y Respaldo', icon: 'settings' }
-            ];
+            const getNavItems = () => {
+                const items = [
+                    { id: 'dashboard', label: 'Resumen Global', icon: 'bar-chart' },
+                    { id: 'empleados', label: 'Directorio', icon: 'users' }
+                ];
+                if (currentUser?.role === 'admin') {
+                    items.push({ id: 'liquidar', label: 'Liquidar Sueldos', icon: 'calculator' });
+                    items.push({ id: 'premios', label: 'Liquidar Premios', icon: 'award' });
+                }
+                items.push({ id: 'informes', label: 'Informes y Edición', icon: 'file-text' });
+                if (currentUser?.role === 'admin') {
+                    items.push({ id: 'configuracion', label: 'Config. y Respaldo', icon: 'settings' });
+                }
+                return items;
+            };
 
-            if (!isLoggedIn) {
-                return <LoginScreen onLogin={() => setIsLoggedIn(true)} />;
+            if (!currentUser) {
+                return <LoginScreen onLogin={(userObj) => setCurrentUser(userObj)} appUsers={appUsers} />;
             }
+
+            const navItems = getNavItems();
 
             return (
                 <div className="flex h-screen overflow-hidden bg-slate-50 font-sans">
@@ -2071,7 +2187,7 @@
                                 {syncStatus === 'synced' && <><span className="w-2 h-2 rounded-full bg-emerald-500"></span> <span className="text-slate-400">En línea (Sincronizado)</span></>}
                                 {syncStatus === 'error' && <><span className="w-2 h-2 rounded-full bg-brand-primary"></span> <span className="text-slate-400">Modo Local (Sin Nube)</span></>}
                             </div>
-                            <button onClick={() => setIsLoggedIn(false)} className="mt-4 w-full text-center text-xs text-slate-500 hover:text-white transition-colors">
+                            <button onClick={() => setCurrentUser(null)} className="mt-4 w-full text-center text-xs text-slate-500 hover:text-white transition-colors">
                                 Cerrar Sesión
                             </button>
                         </div>
@@ -2095,9 +2211,11 @@
                                             <h2 className="text-2xl font-bold text-slate-800">Directorio del Personal</h2>
                                             <p className="text-slate-500 text-sm mt-1">Gestioná, agregá o eliminá empleados de la nómina.</p>
                                         </div>
-                                        <button onClick={() => { setEditModeEmp(false); setNewEmp({ id: null, nombre: '', legajo: '', cuil: '', puesto: '', sueldoBasico: '', presentismoFijo: '', transporteFijo: '' }); setShowAddEmployee(true); }} className="bg-brand-primary text-white px-5 py-2.5 rounded-lg font-bold hover:bg-opacity-90 transition-colors shadow">
-                                            + Nuevo Empleado
-                                        </button>
+                                        {currentUser?.role === 'admin' && (
+                                            <button onClick={() => { setEditModeEmp(false); setNewEmp({ id: null, nombre: '', legajo: '', cuil: '', puesto: '', sueldoBasico: '', presentismoFijo: '', transporteFijo: '', horasBase: 190 }); setShowAddEmployee(true); }} className="bg-brand-primary text-white px-5 py-2.5 rounded-lg font-bold hover:bg-opacity-90 transition-colors shadow">
+                                                + Nuevo Empleado
+                                            </button>
+                                        )}
                                     </div>
 
                                     <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
@@ -2109,7 +2227,7 @@
                                                     <th className="py-4 px-6 font-semibold text-right text-brand-primary">Sueldo Básico</th>
                                                     <th className="py-4 px-6 font-semibold text-right text-green-700">Presentismo Fijo</th>
                                                     <th className="py-4 px-6 font-semibold text-right text-blue-700">SUBE / Transp.</th>
-                                                    <th className="py-4 px-6 font-semibold text-center">Acciones</th>
+                                                    {currentUser?.role === 'admin' && <th className="py-4 px-6 font-semibold text-center">Acciones</th>}
                                                 </tr>
                                             </thead>
                                             <tbody className="divide-y divide-slate-100">
@@ -2120,16 +2238,18 @@
                                                         <td className="py-4 px-6 text-right font-black text-brand-primary">{formatCurrency(emp.sueldoBasico)}</td>
                                                         <td className="py-4 px-6 text-right font-bold text-green-700">{formatCurrency(emp.presentismoFijo)}</td>
                                                         <td className="py-4 px-6 text-right font-bold text-blue-700">{formatCurrency(emp.transporteFijo)}</td>
-                                                        <td className="py-4 px-6 text-center">
-                                                            <div className="flex justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                                <button onClick={() => openEditEmp(emp)} className="p-2 text-brand-primary hover:bg-pink-100 rounded-lg transition-colors" title="Editar">
-                                                                    <Icon name="edit" className="w-4 h-4"/>
-                                                                </button>
-                                                                <button onClick={() => confirmDeleteEmp(emp)} className="p-2 text-red-600 hover:bg-red-100 rounded-lg transition-colors" title="Eliminar">
-                                                                    <Icon name="trash" className="w-4 h-4"/>
-                                                                </button>
-                                                            </div>
-                                                        </td>
+                                                        {currentUser?.role === 'admin' && (
+                                                            <td className="py-4 px-6 text-center">
+                                                                <div className="flex justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                                    <button onClick={() => openEditEmp(emp)} className="p-2 text-brand-primary hover:bg-pink-100 rounded-lg transition-colors" title="Editar">
+                                                                        <Icon name="edit" className="w-4 h-4"/>
+                                                                    </button>
+                                                                    <button onClick={() => confirmDeleteEmp(emp)} className="p-2 text-red-600 hover:bg-red-100 rounded-lg transition-colors" title="Eliminar">
+                                                                        <Icon name="trash" className="w-4 h-4"/>
+                                                                    </button>
+                                                                </div>
+                                                            </td>
+                                                        )}
                                                     </tr>
                                                 ))}
                                                 {empleados.length === 0 && (
@@ -2197,12 +2317,22 @@
                                         handleDelete={handleDeleteRecibo} 
                                         handleEdit={handleEditRecibo} 
                                         handleUpdateNota={handleUpdateNota}
+                                        currentUserRole={currentUser?.role}
                                     />
                                 </div>
                             )}
 
-                            {activeTab === 'configuracion' && (
-                                <Configuracion empleados={empleados} historial={historial} setEmpleados={setEmpleados} setHistorial={setHistorial} showToast={showToast} />
+                            {activeTab === 'configuracion' && currentUser?.role === 'admin' && (
+                                <Configuracion 
+                                    empleados={empleados} 
+                                    historial={historial} 
+                                    setEmpleados={setEmpleados} 
+                                    setHistorial={setHistorial} 
+                                    showToast={showToast} 
+                                    appUsers={appUsers}
+                                    db={db}
+                                    appId={appId}
+                                />
                             )}
                         </main>
                     </div>
